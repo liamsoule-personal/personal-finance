@@ -29,7 +29,7 @@ target_metadata = Base.metadata
 # Database URL
 # ---------------------------------------------------------------------------
 
-_db_url = os.environ.get("DATABASE_URL", "sqlite:////app/data/ledger.db")
+_db_url = os.environ.get("DATABASE_URL", "sqlite:///data/ledger.db")
 config.set_main_option("sqlalchemy.url", _db_url)
 
 

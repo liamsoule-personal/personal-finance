@@ -25,6 +25,13 @@ web/dist/
 # Docker
 .docker/
 
+# Build artifacts
+src/web/static/
+
+# Runtime
+.server.pid
+.venv/
+
 # IDE / tooling
 .vscode/
 .idea/

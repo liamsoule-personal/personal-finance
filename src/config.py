@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     PLAID_CLIENT_ID: str = ""
     PLAID_SECRET: str = ""
     PLAID_ENV: str = "development"
-    DATABASE_URL: str = "sqlite:////app/data/ledger.db"
+    DATABASE_URL: str = "sqlite:///data/ledger.db"
     HOST_SYNC_INTERVAL_SECONDS: int = 3600
 
     class Config:
