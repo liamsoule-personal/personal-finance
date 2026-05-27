@@ -1,9 +1,9 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Personal Finance App – launcher script.
+    Personal Finance App - launcher script.
     Installs Docker Desktop if missing, starts the app, and opens the browser.
-    On first run it also creates a Desktop shortcut so you never need to touch this file again.
+    On first run it also creates Desktop shortcuts so you never need to touch this file again.
 #>
 
 param([switch]$AdminMode)
@@ -14,7 +14,7 @@ $ErrorActionPreference = 'Stop'
 $ProjectRoot      = $PSScriptRoot
 $DockerDesktopExe = "${env:ProgramFiles}\Docker\Docker\Docker Desktop.exe"
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# --- Helpers ------------------------------------------------------------------
 
 function Write-Step { param($msg) Write-Host "`n==> $msg" -ForegroundColor Cyan   }
 function Write-Ok   { param($msg) Write-Host "    [OK] $msg" -ForegroundColor Green  }
@@ -26,25 +26,33 @@ function Test-IsAdmin {
     ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+function Refresh-Path {
+    $env:PATH = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
+                [System.Environment]::GetEnvironmentVariable("Path", "User")
+}
+
 function Test-DockerCliAvailable {
     $null -ne (Get-Command docker -ErrorAction SilentlyContinue)
 }
 
 function Test-DockerRunning {
     try {
-        $output = & docker info 2>&1
+        $null = & docker info 2>&1
         return ($LASTEXITCODE -eq 0)
     } catch { return $false }
 }
 
-# ── Step 1 – Install Docker Desktop if missing ────────────────────────────────
+# Refresh PATH at startup so docker is visible if it was installed in a prior session
+Refresh-Path
+
+# --- Step 1: Install Docker Desktop if missing --------------------------------
 
 Write-Step "Checking Docker Desktop"
 
 $dockerInstalled = (Test-DockerCliAvailable) -or (Test-Path $DockerDesktopExe)
 
 if (-not $dockerInstalled) {
-    Write-Info "Docker Desktop not found – installation required."
+    Write-Info "Docker Desktop not found - installation required."
 
     if (-not (Test-IsAdmin)) {
         Write-Info "Requesting administrator privileges for installation..."
@@ -53,7 +61,7 @@ if (-not $dockerInstalled) {
         exit 0
     }
 
-    # ── 1a. Ensure WSL2 feature is enabled ──────────────────────────────────
+    # Enable WSL2 features
     Write-Info "Enabling WSL2 (required by Docker Desktop)..."
     $wslFeature = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -ErrorAction SilentlyContinue
     if ($wslFeature -and $wslFeature.State -ne 'Enabled') {
@@ -64,7 +72,7 @@ if (-not $dockerInstalled) {
         Enable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -NoRestart | Out-Null
     }
 
-    # ── 1b. Download & install Docker Desktop ───────────────────────────────
+    # Download and install Docker Desktop
     $installer = "$env:TEMP\DockerDesktopInstaller.exe"
     Write-Info "Downloading Docker Desktop (this may take a few minutes)..."
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -73,21 +81,19 @@ if (-not $dockerInstalled) {
         -OutFile $installer `
         -UseBasicParsing
 
-    Write-Info "Installing Docker Desktop – please follow any on-screen prompts..."
+    Write-Info "Installing Docker Desktop - please follow any on-screen prompts..."
     Start-Process -FilePath $installer -ArgumentList "install --quiet --accept-license" -Wait
     Remove-Item $installer -Force -ErrorAction SilentlyContinue
 
-    # Reload PATH so the docker CLI is visible in this session
-    $env:PATH = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
-                [System.Environment]::GetEnvironmentVariable("Path","User")
+    Refresh-Path
 
     Write-Ok "Docker Desktop installed."
-    Write-Info "If the app fails to start, a Windows restart may be needed for WSL2.  Reboot and re-run."
+    Write-Info "If the app fails to start, a Windows restart may be needed for WSL2. Reboot and re-run."
 } else {
     Write-Ok "Docker Desktop is installed."
 }
 
-# ── Step 2 – Start Docker Desktop and wait for the daemon ─────────────────────
+# --- Step 2: Start Docker Desktop and wait for the daemon --------------------
 
 Write-Step "Checking Docker daemon"
 
@@ -102,10 +108,11 @@ if (-not (Test-DockerRunning)) {
     Write-Info "Starting Docker Desktop..."
     Start-Process $DockerDesktopExe
 
-    Write-Info "Waiting for Docker daemon (up to 90 s)..."
+    Write-Info "Waiting for Docker daemon (up to 90 seconds)..."
     $waited = 0
     while ($waited -lt 90) {
-        Start-Sleep 3; $waited += 3
+        Start-Sleep 3
+        $waited += 3
         Write-Host "." -NoNewline
         if (Test-DockerRunning) { break }
     }
@@ -121,7 +128,7 @@ if (-not (Test-DockerRunning)) {
 
 Write-Ok "Docker daemon is ready."
 
-# ── Step 3 – Environment (.env) file ──────────────────────────────────────────
+# --- Step 3: Environment (.env) file -----------------------------------------
 
 Write-Step "Checking environment configuration"
 
@@ -132,7 +139,7 @@ if (-not (Test-Path $envFile)) {
     if (Test-Path $envExample) {
         Copy-Item $envExample $envFile
         Write-Info ".env created from .env.example."
-        Write-Info "Opening .env – fill in your Plaid Client ID and Secret, save, then close Notepad to continue."
+        Write-Info "Opening .env - fill in your Plaid Client ID and Secret, save, then close Notepad to continue."
         Start-Process notepad.exe -ArgumentList $envFile -Wait
     } else {
         Write-Info "No .env file found. App may not connect to Plaid without credentials."
@@ -142,30 +149,30 @@ if (-not (Test-Path $envFile)) {
 if (Test-Path $envFile) {
     $envContent = Get-Content $envFile -Raw
     if ($envContent -match 'your_client_id_here|your_development_secret_here') {
-        Write-Info "WARNING: .env still contains placeholder values – Plaid connection will fail."
+        Write-Info "WARNING: .env still contains placeholder values - Plaid connection will fail."
         Write-Info "Edit '$envFile' and replace the placeholder values with your real Plaid credentials."
     } else {
         Write-Ok ".env is configured."
     }
 }
 
-# ── Step 4 – Build & start the container ──────────────────────────────────────
+# --- Step 4: Build and start the container ------------------------------------
 
 Write-Step "Building and starting Personal Finance app"
-Write-Info "(First run builds the Docker image – this takes ~2 minutes. Later runs are instant.)"
+Write-Info "(First run builds the Docker image - this takes ~2 minutes. Later runs are instant.)"
 
 Set-Location $ProjectRoot
 
 & docker compose up --build -d
 if ($LASTEXITCODE -ne 0) {
-    Write-Err "docker compose failed – see output above."
+    Write-Err "docker compose failed - see output above."
     Read-Host "`nPress Enter to exit"
     exit 1
 }
 
 Write-Ok "Container is up."
 
-# ── Step 5 – Wait for the app to respond ──────────────────────────────────────
+# --- Step 5: Wait for the app to respond -------------------------------------
 
 Write-Step "Waiting for app to respond at http://localhost:8000"
 
@@ -176,7 +183,8 @@ while ($waited -lt 60) {
         $r = Invoke-WebRequest http://localhost:8000 -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
         if ($r.StatusCode -lt 500) { $ready = $true; break }
     } catch {}
-    Start-Sleep 2; $waited += 2
+    Start-Sleep 2
+    $waited += 2
     Write-Host "." -NoNewline
 }
 Write-Host ""
@@ -191,7 +199,7 @@ if (-not $ready) {
 
 Write-Ok "App is ready."
 
-# ── Step 6 – Create Desktop shortcut (first run only) ─────────────────────────
+# --- Step 6: Create Desktop shortcuts (first run only) -----------------------
 
 $shortcutPath = "$env:USERPROFILE\Desktop\Personal Finance.lnk"
 
@@ -200,8 +208,7 @@ if (-not (Test-Path $shortcutPath)) {
     try {
         $wsh = New-Object -ComObject WScript.Shell
 
-        # Launch shortcut
-        $sc  = $wsh.CreateShortcut($shortcutPath)
+        $sc = $wsh.CreateShortcut($shortcutPath)
         $sc.TargetPath       = "powershell.exe"
         $sc.Arguments        = "-NoProfile -WindowStyle Normal -ExecutionPolicy Bypass -File `"$PSCommandPath`""
         $sc.WorkingDirectory = $ProjectRoot
@@ -209,7 +216,6 @@ if (-not (Test-Path $shortcutPath)) {
         $sc.IconLocation     = "%SystemRoot%\system32\shell32.dll, 154"
         $sc.Save()
 
-        # Stop shortcut
         $stopShortcut = "$env:USERPROFILE\Desktop\Stop Personal Finance.lnk"
         $sc2 = $wsh.CreateShortcut($stopShortcut)
         $sc2.TargetPath       = "powershell.exe"
@@ -222,16 +228,16 @@ if (-not (Test-Path $shortcutPath)) {
         Write-Ok "Desktop shortcuts created: 'Personal Finance' (launch) and 'Stop Personal Finance' (stop)."
     } catch {
         Write-Info "Could not create Desktop shortcuts: $_"
-        Write-Info "You can run launcher.ps1 / stop.ps1 directly instead."
+        Write-Info "You can run launcher.ps1 and stop.ps1 directly instead."
     }
 }
 
-# ── Step 7 – Open browser ──────────────────────────────────────────────────────
+# --- Step 7: Open browser ----------------------------------------------------
 
 Write-Step "Opening Personal Finance app"
 Start-Process "http://localhost:8000"
 
 Write-Host ""
 Write-Host "  Personal Finance is running at http://localhost:8000" -ForegroundColor Green
-Write-Host "  To stop the app, run stop.ps1 (or double-click 'Stop Personal Finance' on your Desktop)." -ForegroundColor DarkGray
+Write-Host "  To stop the app, run stop.ps1 or double-click 'Stop Personal Finance' on your Desktop." -ForegroundColor DarkGray
 Write-Host ""
