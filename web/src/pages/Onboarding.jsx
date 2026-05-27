@@ -135,6 +135,18 @@ export default function Onboarding({ onConnected }) {
             color: '#DC2626'
           }}>
             {error}
+            <div style={{ marginTop: 6, color: '#6B7280' }}>
+              Need a Plaid account?{' '}
+              <a
+                href="https://dashboard.plaid.com/signup"
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: '#1B2B6B', fontWeight: 600, textDecoration: 'underline' }}
+              >
+                Sign up free
+              </a>
+              {' '}then add your credentials to the <code style={{ fontSize: 12 }}>.env</code> file.
+            </div>
           </div>
         )}
 
@@ -161,7 +173,16 @@ export default function Onboarding({ onConnected }) {
           lineHeight: 1.5
         }}>
           Your credentials are never stored by Weekly Ledger.
-          <br />Powered by <span style={{ fontWeight: 600, color: '#6B7280' }}>Plaid</span> — bank-level 256-bit encryption.
+          <br />Powered by{' '}
+          <a
+            href="https://dashboard.plaid.com/signup"
+            target="_blank"
+            rel="noreferrer"
+            style={{ fontWeight: 600, color: '#6B7280', textDecoration: 'underline' }}
+          >
+            Plaid
+          </a>
+          {' '}— bank-level 256-bit encryption.
         </div>
       </div>
     </div>
