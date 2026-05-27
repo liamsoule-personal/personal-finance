@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    container_name: weekly-ledger
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PLAID_CLIENT_ID=${PLAID_CLIENT_ID}
+      - PLAID_SECRET=${PLAID_SECRET}
+      - PLAID_ENV=development
+      - DATABASE_URL=sqlite:////app/data/ledger.db
+    restart: unless-stopped

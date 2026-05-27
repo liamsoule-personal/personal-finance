@@ -1,0 +1,39 @@
+# Environment — never commit credentials
+.env
+
+# Database — contains your financial data and Plaid tokens
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+
+# Node
+web/node_modules/
+web/dist/
+
+# Docker
+.docker/
+
+# IDE / tooling
+.vscode/
+.idea/
+*.swp
+*.swo
+.claude/
+
+# macOS
+.DS_Store
+
+# Alembic generated versions (keep the initial migration, ignore auto-generated)
+# alembic/versions/  # uncomment to ignore all migrations
