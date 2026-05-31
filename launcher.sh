@@ -84,6 +84,7 @@ else
 
   STATIC_DIR="$SCRIPT_DIR/src/web/static"
   rm -rf "$STATIC_DIR"
+  mkdir -p "$(dirname "$STATIC_DIR")"
   cp -r "$SCRIPT_DIR/web/dist" "$STATIC_DIR"
   ok "Frontend built and copied to src/web/static."
 fi
