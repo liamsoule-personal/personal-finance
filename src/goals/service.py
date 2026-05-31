@@ -7,6 +7,10 @@ from sqlalchemy.orm import Session
 
 from src.storage.models import Goal, Transaction
 
+# Fraction of weekly consumer spending that typically falls on each day Mon–Sun.
+# Weights sum to 1.0; used so a Monday-only reading isn't extrapolated as 7× the daily rate.
+_DAY_WEIGHTS = [0.10, 0.12, 0.14, 0.14, 0.20, 0.18, 0.12]
+
 # Mirror of the frontend PRIMARY_CATEGORIES list so category matching is consistent
 _PRIMARY_CATEGORIES = [
     "FOOD_AND_DRINK", "TRANSPORTATION", "SHOPS", "ENTERTAINMENT",
@@ -52,7 +56,14 @@ def compute_progress(goal: Goal, week_start: date, today: date, txns: list[Trans
     limit = float(goal.weekly_limit)
 
     days_elapsed = max(1, min(7, (today - week_start).days + 1))
-    projected = (actual / days_elapsed) * 7
+
+    # Day-of-week weighted projection: sum the spend-mass fractions for elapsed
+    # days, then scale actual up to a full-week estimate.  Friday/Saturday carry
+    # higher weights (0.20/0.18) than Monday (0.10), so mid-week readings that
+    # haven't yet hit the heavy spending days project higher than a naive
+    # daily-rate × 7 would.
+    mass_elapsed = sum(_DAY_WEIGHTS[:days_elapsed])
+    projected = actual / mass_elapsed if mass_elapsed > 0 else actual
 
     return {
         "actual_spend": round(actual, 2),
