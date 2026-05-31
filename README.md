@@ -6,11 +6,8 @@ A personal finance tracker that connects to your bank accounts via Plaid and dis
 
 ## Requirements
 
-Before installing, make sure you have:
-
-- **Windows 10 or 11**
-- **Git** — [download here](https://git-scm.com/download/win) if not already installed
-- **Plaid account** — sign up free at [dashboard.plaid.com](https://dashboard.plaid.com). You will need your **Client ID** and **Secret** from Team Settings -> Keys.
+- **Git** — [download here](https://git-scm.com/downloads) if not already installed
+- **A Plaid account** — sign up free at [dashboard.plaid.com](https://dashboard.plaid.com/signup). You will need your **Client ID** and **Secret** from Team Settings → Keys. *(The app walks you through this on first run.)*
 
 > Everything else (uv, Node.js) is installed automatically by the launcher on first run.
 
@@ -20,66 +17,86 @@ Before installing, make sure you have:
 
 ### Step 1 — Clone the repository
 
-Open PowerShell and run:
-
-```powershell
+```bash
 git clone https://github.com/liamsoule-personal/personal-finance.git
 cd personal-finance
 ```
 
 ### Step 2 — Run the launcher
 
-Right-click `launcher.ps1` and select **"Run with PowerShell"**.
+**macOS / Linux:**
+```bash
+chmod +x launcher.sh   # only needed once after cloning
+./launcher.sh
+```
 
-The launcher will automatically:
+**Windows:**
 
-1. Install **uv** (Python package manager) if not already present — takes ~5 seconds
-2. Install **Node.js** if not already present — takes ~30 seconds, only needed once
-3. Build the React frontend and copy it into place
-4. Create an isolated Python environment and install all dependencies — ~25 seconds on first run
-5. Create a **`.env` file** and open it in Notepad for you to fill in your Plaid credentials
-6. Run database migrations
-7. Start the application server
-8. Create **Desktop shortcuts** — "Personal Finance" (launch) and "Stop Personal Finance" (stop)
-9. Open the app in your browser at `http://localhost:8000`
+Right-click `launcher.ps1` and select **"Run with PowerShell"**, or run in PowerShell:
+```powershell
+powershell -ExecutionPolicy Bypass -File launcher.ps1
+```
+
+The launcher automatically:
+1. Installs **uv** (Python package manager) if not present
+2. Installs **Node.js** if not present (macOS: via Homebrew; Windows: via winget)
+3. Builds the React frontend
+4. Creates an isolated Python environment and installs all dependencies
+5. Creates a `.env` file and runs database migrations
+6. Starts the application server
+7. Opens the app in your browser at `http://localhost:8000`
 
 ### Step 3 — Enter your Plaid credentials
 
-When the `.env` file opens in Notepad, fill in your values:
+On first launch the app opens a **setup screen** asking for your Plaid API keys.
+Click the **"Sign up for Plaid →"** button if you don't have an account yet, then:
 
-```
-PLAID_CLIENT_ID=your_client_id_here
-PLAID_SECRET=your_development_secret_here
-PLAID_ENV=development
-```
+1. Log in to [dashboard.plaid.com](https://dashboard.plaid.com)
+2. Go to **Team Settings → Keys**
+3. Copy your **Client ID** and **Secret**
+4. Paste them into the setup screen and click **Save & Continue**
 
-Save and close Notepad. The launcher will continue automatically.
+Your credentials are saved to a `.env` file on your machine only — they are never transmitted anywhere except directly to Plaid.
 
 ---
 
 ## Daily Use
 
-After the first run, use the **Desktop shortcuts** created during setup:
+### macOS / Linux
+
+| Action | Command |
+|--------|---------|
+| Start the app | `./launcher.sh` |
+| Stop the app | `./stop.sh` |
+| View server logs | `cat .server.log` |
+
+### Windows
+
+Use the **Desktop shortcuts** created during the first run:
 
 | Shortcut | What it does |
-|----------|-------------|
-| **Personal Finance** | Starts the server and opens the app in your browser |
+|----------|--------------|
+| **Personal Finance** | Starts the server and opens the app |
 | **Stop Personal Finance** | Shuts down the server |
-
-The server runs in a minimized window in your taskbar while the app is active.
 
 ---
 
 ## Updating the App
 
-To pull the latest version, open PowerShell in the project folder and run:
+Pull the latest version:
 
-```powershell
+```bash
 git pull
 ```
 
-Then relaunch using the Desktop shortcut. If the frontend source changed, run the launcher with `-Rebuild` to force a fresh frontend build:
+Then relaunch. If frontend source files changed, force a fresh build:
 
+**macOS / Linux:**
+```bash
+./launcher.sh --rebuild
+```
+
+**Windows:**
 ```powershell
 powershell -ExecutionPolicy Bypass -File launcher.ps1 -Rebuild
 ```
@@ -88,20 +105,43 @@ powershell -ExecutionPolicy Bypass -File launcher.ps1 -Rebuild
 
 ## Troubleshooting
 
-**App did not respond — check the server window**
-Look for a minimized PowerShell window in your taskbar labelled with the uvicorn process. Expand it to see any error output.
+### "Permission denied" when running `launcher.sh` (macOS / Linux)
 
-**Plaid connection is not working**
-Ensure your `.env` file has the correct Client ID and Secret from [dashboard.plaid.com](https://dashboard.plaid.com). Use `PLAID_ENV=sandbox` to test with fake data without real bank credentials.
+The script needs to be marked executable. Run once:
 
-**PowerShell says "running scripts is disabled"**
+```bash
+chmod +x launcher.sh stop.sh
+```
+
+### PowerShell says "running scripts is disabled" (Windows)
+
 Run this once in PowerShell as Administrator, then re-run the launcher:
+
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-**Frontend looks outdated after a `git pull`**
-Run the launcher with `-Rebuild` to force a fresh build:
-```powershell
-powershell -ExecutionPolicy Bypass -File launcher.ps1 -Rebuild
+### App did not respond / blank page
+
+Check the server logs for errors:
+
+```bash
+# macOS / Linux
+cat .server.log
+
+# Windows — look for a minimized PowerShell window in the taskbar
+```
+
+### Plaid connection is not working
+
+- Confirm your **Client ID** and **Secret** are correct in the app's setup screen (or in the `.env` file).
+- Use `PLAID_ENV=sandbox` in the setup screen to test with fake data without a real bank connection.
+
+### Node.js not found on macOS
+
+Install [Homebrew](https://brew.sh) first, then re-run the launcher:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+./launcher.sh
 ```

@@ -30,6 +30,7 @@ src/web/static/
 
 # Runtime
 .server.pid
+.server.log
 .venv/
 
 # IDE / tooling
