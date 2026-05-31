@@ -21,18 +21,16 @@ from src.storage.models import Account, PlaidItem
 # Plaid client setup
 # ---------------------------------------------------------------------------
 
-plaid_config = Configuration(
-    host=f"https://{settings.PLAID_ENV}.plaid.com",
-    api_key={
-        "clientId": settings.PLAID_CLIENT_ID,
-        "secret": settings.PLAID_SECRET,
-    },
-)
-
 
 def _get_plaid_client() -> plaid_api.PlaidApi:
-    api_client = ApiClient(plaid_config)
-    return plaid_api.PlaidApi(api_client)
+    config = Configuration(
+        host=f"https://{settings.PLAID_ENV}.plaid.com",
+        api_key={
+            "clientId": settings.PLAID_CLIENT_ID,
+            "secret": settings.PLAID_SECRET,
+        },
+    )
+    return plaid_api.PlaidApi(ApiClient(config))
 
 
 # ---------------------------------------------------------------------------

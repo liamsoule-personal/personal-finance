@@ -4,6 +4,7 @@ import os
 import threading
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 from fastapi import BackgroundTasks, Body, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +22,7 @@ from src.analytics import service as analytics_svc
 from src.api.schemas import (
     AccountOut,
     CreateRuleRequest,
+    CredentialsRequest,
     ExchangeTokenRequest,
     LinkTokenRequest,
     LinkTokenResponse,
@@ -276,7 +278,7 @@ app.add_middleware(
 )
 
 # Mount static files if the directory exists
-_static_dir = os.path.join(os.path.dirname(__file__), "..", "web", "static")
+_static_dir = os.path.join(os.path.dirname(__file__), "..", "web", "static", "assets")
 if os.path.isdir(_static_dir):
     app.mount("/assets", StaticFiles(directory=_static_dir), name="static")
 
@@ -289,6 +291,58 @@ if os.path.isdir(_static_dir):
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+# --- Setup ---
+
+_PLACEHOLDERS = {"", "your_client_id_here", "your_development_secret_here"}
+_ENV_FILE = Path(".env")
+
+
+def _plaid_configured() -> bool:
+    return (
+        settings.PLAID_CLIENT_ID not in _PLACEHOLDERS
+        and settings.PLAID_SECRET not in _PLACEHOLDERS
+    )
+
+
+def _write_env_var(key: str, value: str) -> None:
+    lines = _ENV_FILE.read_text(encoding="utf-8").splitlines(keepends=True) if _ENV_FILE.exists() else []
+    updated = False
+    result = []
+    for line in lines:
+        if line.startswith(f"{key}="):
+            result.append(f"{key}={value}\n")
+            updated = True
+        else:
+            result.append(line)
+    if not updated:
+        result.append(f"{key}={value}\n")
+    _ENV_FILE.write_text("".join(result), encoding="utf-8")
+
+
+@app.get("/api/setup/status")
+def setup_status():
+    return {"configured": _plaid_configured()}
+
+
+@app.post("/api/setup/credentials", status_code=200)
+def save_credentials(body: CredentialsRequest):
+    if not body.client_id.strip() or not body.secret.strip():
+        raise HTTPException(status_code=422, detail="client_id and secret are required")
+    if body.plaid_env not in ("sandbox", "development", "production"):
+        raise HTTPException(status_code=422, detail="plaid_env must be sandbox, development, or production")
+
+    _write_env_var("PLAID_CLIENT_ID", body.client_id.strip())
+    _write_env_var("PLAID_SECRET", body.secret.strip())
+    _write_env_var("PLAID_ENV", body.plaid_env)
+
+    # Hot-reload settings in memory so the running process uses the new credentials
+    settings.PLAID_CLIENT_ID = body.client_id.strip()
+    settings.PLAID_SECRET = body.secret.strip()
+    settings.PLAID_ENV = body.plaid_env
+
+    return {"configured": True}
 
 
 # --- Plaid ---

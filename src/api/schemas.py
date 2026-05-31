@@ -73,3 +73,9 @@ class RuleOut(BaseModel):
     created_at: str
     last_applied_at: str | None
     match_count: int
+
+
+class CredentialsRequest(BaseModel):
+    client_id: str
+    secret: str
+    plaid_env: str = "development"

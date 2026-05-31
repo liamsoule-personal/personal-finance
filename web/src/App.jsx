@@ -4,17 +4,26 @@ import { api } from './lib/api'
 import Dashboard from './pages/Dashboard'
 import AllTransactions from './pages/AllTransactions'
 import Onboarding from './pages/Onboarding'
+import Setup from './pages/Setup'
 
 function AppRoutes() {
+  const [configured, setConfigured] = useState(null)
   const [hasAccounts, setHasAccounts] = useState(null)
 
   useEffect(() => {
+    api.get('/setup/status')
+      .then(data => setConfigured(data.configured))
+      .catch(() => setConfigured(false))
+  }, [])
+
+  useEffect(() => {
+    if (!configured) return
     api.get('/accounts')
       .then(accounts => setHasAccounts(accounts.length > 0))
       .catch(() => setHasAccounts(false))
-  }, [])
+  }, [configured])
 
-  if (hasAccounts === null) {
+  if (configured === null || (configured && hasAccounts === null)) {
     return (
       <div style={{
         display: 'flex',
@@ -43,16 +52,28 @@ function AppRoutes() {
   return (
     <Routes>
       <Route
+        path="/setup"
+        element={<Setup onConfigured={() => { setConfigured(true); setHasAccounts(false) }} />}
+      />
+      <Route
         path="/onboarding"
-        element={<Onboarding onConnected={() => setHasAccounts(true)} />}
+        element={configured ? <Onboarding onConnected={() => setHasAccounts(true)} /> : <Navigate to="/setup" />}
       />
       <Route
         path="/"
-        element={hasAccounts ? <Dashboard /> : <Navigate to="/onboarding" />}
+        element={
+          !configured ? <Navigate to="/setup" /> :
+          !hasAccounts ? <Navigate to="/onboarding" /> :
+          <Dashboard />
+        }
       />
       <Route
         path="/transactions"
-        element={hasAccounts ? <AllTransactions /> : <Navigate to="/onboarding" />}
+        element={
+          !configured ? <Navigate to="/setup" /> :
+          !hasAccounts ? <Navigate to="/onboarding" /> :
+          <AllTransactions />
+        }
       />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
