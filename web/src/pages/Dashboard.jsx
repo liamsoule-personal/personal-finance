@@ -277,7 +277,7 @@ export default function Dashboard() {
           ) : (
             <TransactionTable
               transactions={transactions}
-              showExcluded={false}
+              showExcluded={true}
               onReclassify={handleReclassify}
               updateTransaction={updateTransaction}
               categoryFilter={selectedCategory}

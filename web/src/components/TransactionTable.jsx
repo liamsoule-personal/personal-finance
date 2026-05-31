@@ -178,13 +178,14 @@ export default function TransactionTable({
                 <ColHeader col="description" label="Description" />
                 <ColHeader col="category" label="Category" />
                 <ColHeader col="amount" label="Amount" style={{ textAlign: 'right' }} />
+                <th style={{ ...thStyle, width: 110, cursor: 'default' }}>Status</th>
                 <th style={{ ...thStyle, width: 48, cursor: 'default' }}></th>
               </tr>
             </thead>
             <tbody>
               {visible.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '40px 20px', textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
+                  <td colSpan={6} style={{ padding: '40px 20px', textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
                     No transactions
                   </td>
                 </tr>
@@ -227,14 +228,6 @@ export default function TransactionTable({
                           </span>
                           {txn.pending && <span className="chip chip-pending">Pending</span>}
                           {txn.user_detailed_category && <span className="chip chip-reclassified">Reclassified</span>}
-                          {isExcluded && (
-                            <span className="chip chip-excluded">
-                              {txn.auto_excluded_reason
-                                ? (AUTO_EXCLUDED_LABELS[txn.auto_excluded_reason] || 'Auto: Excluded')
-                                : 'Excluded'
-                              }
-                            </span>
-                          )}
                         </div>
                         {txn.merchant_name && txn.merchant_name !== txn.description && (
                           <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>
@@ -266,6 +259,32 @@ export default function TransactionTable({
                         whiteSpace: 'nowrap'
                       }}>
                         {txn.spend_amount != null ? formatAmount(txn.spend_amount) : '—'}
+                      </td>
+
+                      {/* Status */}
+                      <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                        {isExcluded ? (
+                          <span className="chip chip-excluded">
+                            {txn.auto_excluded_reason
+                              ? (AUTO_EXCLUDED_LABELS[txn.auto_excluded_reason] || 'Auto: Excluded')
+                              : 'Excluded'
+                            }
+                          </span>
+                        ) : (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: '#065F46',
+                            background: '#D1FAE5',
+                            borderRadius: 999,
+                            padding: '2px 8px',
+                          }}>
+                            ● Counted
+                          </span>
+                        )}
                       </td>
 
                       {/* Actions */}
