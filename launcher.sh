@@ -20,12 +20,16 @@ for arg in "$@"; do [[ "$arg" == "--rebuild" ]] && REBUILD=true; done
 # ---------------------------------------------------------------------------
 step "Checking uv (Python package manager)"
 
-# Add common install locations to PATH so we find uv after a fresh install
+# Add common install locations so we find uv immediately after a fresh install
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 
 if ! command -v uv &>/dev/null; then
   info "uv not found — installing via official installer..."
-  curl -LsSf https://astral.sh/uv/install.sh | sh
+  # Explicit error message if the download fails (e.g. no network)
+  curl -LsSf https://astral.sh/uv/install.sh | sh || {
+    err "Failed to download or install uv. Check your internet connection and try again."
+    exit 1
+  }
   export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 fi
 
@@ -50,7 +54,9 @@ if [[ "$NEEDS_BUILD" == true ]]; then
   if ! command -v node &>/dev/null; then
     info "Node.js not found — attempting install..."
     if command -v brew &>/dev/null; then
-      brew install node
+      # Use || true so a non-fatal brew error (e.g. stale tap) doesn't abort the
+      # script via set -e before we get to check whether node actually installed.
+      brew install node || true
     else
       err "Node.js is required but not installed, and Homebrew was not found."
       err "Install Node.js from https://nodejs.org  or run: brew install node"
@@ -64,7 +70,7 @@ if [[ "$NEEDS_BUILD" == true ]]; then
   fi
   ok "Node.js: $(node --version)"
 else
-  ok "Frontend already built — skipping Node.js check. (Run with --rebuild to force a fresh build.)"
+  ok "Frontend already built — skipping Node.js check. (Run with --rebuild to force a rebuild.)"
 fi
 
 # ---------------------------------------------------------------------------
@@ -77,7 +83,8 @@ if [[ "$NEEDS_BUILD" == false ]]; then
 else
   info "Installing npm dependencies..."
   pushd "$SCRIPT_DIR/web" > /dev/null
-  npm install --silent
+  # --loglevel=error keeps progress noise quiet but still surfaces real errors
+  npm install --loglevel=error
   info "Building..."
   npm run build
   popd > /dev/null
@@ -157,17 +164,28 @@ fi
 ok "Database is up to date."
 
 # ---------------------------------------------------------------------------
-# Step 7 — Stop any existing server
+# Step 7 — Stop any existing server on port 8000
 # ---------------------------------------------------------------------------
 PID_FILE="$SCRIPT_DIR/.server.pid"
+
+# Kill our previously tracked server if it is still running
 if [[ -f "$PID_FILE" ]]; then
   OLD_PID=$(cat "$PID_FILE")
-  if kill -0 "$OLD_PID" 2>/dev/null; then
+  # Guard against an empty or corrupt PID file
+  if [[ -n "$OLD_PID" ]] && kill -0 "$OLD_PID" 2>/dev/null; then
     info "Stopping existing server (PID $OLD_PID)..."
     kill "$OLD_PID" 2>/dev/null || true
     sleep 1
   fi
   rm -f "$PID_FILE"
+fi
+
+# Check whether something else is already holding port 8000
+if lsof -i :8000 -sTCP:LISTEN -t &>/dev/null; then
+  err "Port 8000 is already in use by another process."
+  err "Stop that process first, or run on a different port."
+  lsof -i :8000 -sTCP:LISTEN
+  exit 1
 fi
 
 # ---------------------------------------------------------------------------
@@ -191,6 +209,15 @@ step "Waiting for app to respond at http://localhost:8000"
 
 READY=false
 for i in $(seq 1 30); do
+  # If the process already died, show the log immediately instead of
+  # waiting out the full 30-second timeout.
+  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    printf "\n"
+    err "Server process exited unexpectedly. Last log output:"
+    tail -20 "$LOG_FILE" | sed 's/^/    /'
+    exit 1
+  fi
+
   if curl -sf http://localhost:8000/api/health > /dev/null 2>&1; then
     READY=true
     break
@@ -202,7 +229,8 @@ printf "\n"
 
 if [[ "$READY" == false ]]; then
   err "App did not respond within 30 seconds."
-  info "Check logs: cat $LOG_FILE"
+  info "Last log output:"
+  tail -20 "$LOG_FILE" | sed 's/^/    /'
   exit 1
 fi
 
