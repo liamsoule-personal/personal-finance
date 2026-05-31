@@ -24,12 +24,17 @@ from src.api.schemas import (
     CreateRuleRequest,
     CredentialsRequest,
     ExchangeTokenRequest,
+    GoalCreate,
+    GoalOut,
+    GoalUpdate,
     LinkTokenRequest,
     LinkTokenResponse,
     RuleOut,
     TransactionOut,
     TransactionUpdate,
 )
+from src.goals import service as goals_svc
+from src.storage.models import Goal
 from src.categorization import service as categorization_svc
 from src.config import settings
 from src.ingestion import service as ingestion_svc
@@ -326,6 +331,49 @@ def setup_status():
     return {"configured": _plaid_configured()}
 
 
+@app.post("/api/setup/create-shortcut")
+def create_desktop_shortcut():
+    import subprocess
+    import sys
+
+    desktop = Path.home() / "Desktop"
+    if not desktop.exists():
+        raise HTTPException(status_code=400, detail="Desktop directory not found")
+
+    project_root = Path(".").resolve()
+
+    if sys.platform == "darwin":
+        shortcut = desktop / "Personal Finance.command"
+        shortcut.write_text(
+            f'#!/usr/bin/env bash\ncd "{project_root}"\n./launcher.sh\n',
+            encoding="utf-8",
+        )
+        shortcut.chmod(0o755)
+        return {"created": True, "path": str(shortcut)}
+
+    if sys.platform == "win32":
+        lnk = desktop / "Personal Finance.lnk"
+        ps = (
+            f"$wsh = New-Object -ComObject WScript.Shell; "
+            f"$sc = $wsh.CreateShortcut('{lnk}'); "
+            f"$sc.TargetPath = 'powershell.exe'; "
+            f"$sc.Arguments = '-NoProfile -WindowStyle Normal -ExecutionPolicy Bypass "
+            f"-File \"{project_root}\\launcher.ps1\"'; "
+            f"$sc.WorkingDirectory = '{project_root}'; "
+            f"$sc.Description = 'Launch Personal Finance App'; "
+            f"$sc.IconLocation = '%SystemRoot%\\system32\\shell32.dll, 154'; "
+            f"$sc.Save()"
+        )
+        result = subprocess.run(
+            ["powershell", "-Command", ps], capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            raise HTTPException(status_code=500, detail=result.stderr.strip())
+        return {"created": True, "path": str(lnk)}
+
+    raise HTTPException(status_code=400, detail="Desktop shortcuts not supported on this platform")
+
+
 @app.post("/api/setup/credentials", status_code=200)
 def save_credentials(body: CredentialsRequest):
     if not body.client_id.strip() or not body.secret.strip():
@@ -518,6 +566,62 @@ def analytics_week(week_start: str | None = None, db: Session = Depends(get_db))
 @app.get("/api/categories")
 def get_categories():
     return PLAID_CATEGORIES
+
+
+# --- Goals ---
+
+
+@app.get("/api/goals", response_model=list[GoalOut])
+def list_goals(week_start: str | None = None, db: Session = Depends(get_db)):
+    ws = _parse_week_start(week_start)
+    return goals_svc.list_goals(db, ws)
+
+
+@app.post("/api/goals", response_model=GoalOut, status_code=201)
+def create_goal(body: GoalCreate, db: Session = Depends(get_db)):
+    if body.type not in ("weekly", "category"):
+        raise HTTPException(status_code=422, detail="type must be 'weekly' or 'category'")
+    if body.type == "category" and not body.category:
+        raise HTTPException(status_code=422, detail="category is required for category goals")
+    if body.weekly_limit <= 0:
+        raise HTTPException(status_code=422, detail="weekly_limit must be greater than zero")
+    goal = goals_svc.create_goal(
+        db, name=body.name, type=body.type,
+        category=body.category, weekly_limit=body.weekly_limit,
+    )
+    ws = _parse_week_start(None)
+    progress = goals_svc.compute_progress(goal, ws, __import__("datetime").date.today(),
+                                          goals_svc._week_transactions(db, ws))
+    return GoalOut(
+        id=goal.id, name=goal.name, type=goal.type, category=goal.category,
+        weekly_limit=float(goal.weekly_limit),
+        created_at=goal.created_at.isoformat() if goal.created_at else "",
+        **progress,
+    )
+
+
+@app.patch("/api/goals/{goal_id}", response_model=GoalOut)
+def update_goal(goal_id: str, body: GoalUpdate, db: Session = Depends(get_db)):
+    fields = body.model_dump(exclude_none=True)
+    if "weekly_limit" in fields and fields["weekly_limit"] <= 0:
+        raise HTTPException(status_code=422, detail="weekly_limit must be greater than zero")
+    goal = goals_svc.update_goal(db, goal_id, **fields)
+    if goal is None:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    ws = _parse_week_start(None)
+    progress = goals_svc.compute_progress(goal, ws, __import__("datetime").date.today(),
+                                          goals_svc._week_transactions(db, ws))
+    return GoalOut(
+        id=goal.id, name=goal.name, type=goal.type, category=goal.category,
+        weekly_limit=float(goal.weekly_limit),
+        created_at=goal.created_at.isoformat() if goal.created_at else "",
+        **progress,
+    )
+
+
+@app.delete("/api/goals/{goal_id}", status_code=204)
+def delete_goal(goal_id: str, db: Session = Depends(get_db)):
+    goals_svc.delete_goal(db, goal_id)
 
 
 # ---------------------------------------------------------------------------

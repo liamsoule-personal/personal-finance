@@ -79,3 +79,29 @@ class CredentialsRequest(BaseModel):
     client_id: str
     secret: str
     plaid_env: str = "development"
+
+
+class GoalCreate(BaseModel):
+    name: str
+    type: str  # 'weekly' | 'category'
+    category: str | None = None
+    weekly_limit: float
+
+
+class GoalUpdate(BaseModel):
+    name: str | None = None
+    weekly_limit: float | None = None
+
+
+class GoalOut(BaseModel):
+    id: str
+    name: str
+    type: str
+    category: str | None
+    weekly_limit: float
+    created_at: str
+    actual_spend: float | None = None
+    projected_spend: float | None = None
+    percent_used: float | None = None
+    days_elapsed: int | None = None
+    status: str | None = None  # 'on_track' | 'off_track'

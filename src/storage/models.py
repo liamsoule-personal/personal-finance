@@ -130,6 +130,17 @@ class CategorizationRule(Base):
     match_count = Column(Integer, default=0)
 
 
+class Goal(Base):
+    __tablename__ = "goals"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    name = Column(String, nullable=False)
+    type = Column(String, nullable=False)  # 'weekly' | 'category'
+    category = Column(String, nullable=True)  # primary category key; NULL for weekly goals
+    weekly_limit = Column(Numeric(12, 2), nullable=False)
+    created_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
+
+
 class SyncLog(Base):
     __tablename__ = "sync_log"
 

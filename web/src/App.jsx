@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { api } from './lib/api'
 import Dashboard from './pages/Dashboard'
 import AllTransactions from './pages/AllTransactions'
+import Goals from './pages/Goals'
 import Onboarding from './pages/Onboarding'
 import Setup from './pages/Setup'
 
@@ -73,6 +74,14 @@ function AppRoutes() {
           !configured ? <Navigate to="/setup" /> :
           !hasAccounts ? <Navigate to="/onboarding" /> :
           <AllTransactions />
+        }
+      />
+      <Route
+        path="/goals"
+        element={
+          !configured ? <Navigate to="/setup" /> :
+          !hasAccounts ? <Navigate to="/onboarding" /> :
+          <Goals />
         }
       />
       <Route path="*" element={<Navigate to="/" />} />
